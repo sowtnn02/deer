@@ -13,204 +13,191 @@
       margin: 0;
       text-align: center;
     }
-    h1 {
-      font-size: 1.8em;
-      margin-bottom: 30px;
-      color: #3c6478;
-    }
+    h1 { font-size: 1.8em; margin-bottom: 30px; color: #3c6478; }
     .card {
       background-color: white;
       max-width: 600px;
       margin: auto;
       padding: 30px;
       border-radius: 15px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 20px rgba(0,0,0,.1);
     }
     select, button {
-      width: 90%;
-      max-width: 400px;
-      margin: 10px auto;
-      padding: 10px 15px;
-      font-size: 1em;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      outline: none;
-      transition: border-color 0.3s ease;
+      width: 90%; max-width: 400px; margin: 10px auto;
+      padding: 10px 15px; font-size: 1em;
+      border: 1px solid #ccc; border-radius: 8px; outline: none;
+      transition: border-color .3s ease;
     }
-    select:focus, button:focus {
-      border-color: #47a7f5;
-    }
-    button {
-      background-color: #47a7f5;
-      color: white;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    button:hover {
-      background-color: #358ddb;
-    }
-    ul#result {
-      list-style: none;
-      padding: 0;
-      margin-top: 20px;
-    }
+    select:focus, button:focus { border-color: #47a7f5; }
+    button { background:#47a7f5; color:#fff; cursor:pointer; font-weight:bold; }
+    button:hover { background:#358ddb; }
+    ul#result { list-style:none; padding:0; margin-top:20px; }
     ul#result li {
-      padding: 8px;
-      margin: 6px auto;
-      max-width: 500px;
-      border-radius: 8px;
-      background-color: #f1f8ff;
-      border-left: 6px solid #47a7f5;
-      text-align: left;
+      padding:8px; margin:6px auto; max-width:500px;
+      border-radius:8px; background:#f1f8ff; border-left:6px solid #47a7f5;
+      text-align:left;
     }
-    .status-present { color: green; font-weight: bold; }
-    .status-absent { color: red; font-weight: bold; }
-    .status-unfilled { color: gray; font-style: italic; }
+    .status-present{color:green;font-weight:bold;}
+    .status-absent{color:red;font-weight:bold;}
+    .status-unfilled{color:gray;font-style:italic;}
   </style>
 </head>
 <body>
   <h1>
-    <a href="index.html" style="text-decoration: none; color: inherit;">
+    <a href="index.html" style="text-decoration:none;color:inherit;">
       🦌 荒野保護協會親子團南二團 小隊出席狀況 🦌
     </a>
   </h1>
+
   <div class="card">
     <select id="group" onchange="updateTypeOptions()">
       <option value="">選擇團別</option>
       <option value="deer">🦌 小鹿 🦌</option>
+      <!-- 若未來要開放其他團，可再加入
+      <option value="bee">🐝 小蜂 🐝</option>
+      <option value="ant">🐜 小蟻 🐜</option>
+      <option value="eagle">🦅 小鷹 🦅</option>
+      -->
     </select>
+
     <select id="type" onchange="checkTeamAttendance()" disabled>
       <option value="">選擇小隊</option>
     </select>
-    <div id="loading" style="margin-top: 20px; font-size: 1.1em; color: #888;"></div>
+
+    <div id="loading" style="margin-top:20px;font-size:1.1em;color:#888;"></div>
     <ul id="result"></ul>
   </div>
 
+  <!-- 小隊名單 (team-data114.js 必須提供 userOptions 物件) -->
   <script src="team-data114.js"></script>
+
   <script>
+    /** ============ 基本設定 ============ **/
     const SHEET_URL = "https://opensheet.elk.sh/13v4T864SSZGSoNiIPGOY12mfzT2q5sbvDrarusC_zLE/%E9%B9%BF";
 
+    /** 各團對應的「整團中文名稱」備援字串 **/
+    const backupNameMap = {
+      deer : "奔鹿團",
+      bee  : "炫蜂團",
+      ant  : "小螞蟻團",
+      eagle: "翔鷹團"
+    };
+
+    /** 讀取「表單連結清單」 **/
     async function loadSheetsFromSheet() {
-      const res = await fetch(SHEET_URL);
-      const raw = await res.json();
+      const res  = await fetch(SHEET_URL);
+      const raw  = await res.json();
       return raw.map(item => ({
         name: `${item.month} ${item.title}`,
-        url: convertToOpensheet(item.response_url)
+        url : convertToOpensheet(item.response_url)
       }));
     }
 
-    function convertToOpensheet(googleSheetUrl) {
-      const match = googleSheetUrl.match(/\/d\/(.*?)(\/|$)/);
-      const sheetId = match ? match[1] : "";
-      return `https://opensheet.elk.sh/${sheetId}/%E8%A1%A8%E5%96%AE%E5%9B%9E%E6%87%89%201`;
+    /** Google Sheet → opensheet 轉換 **/
+    function convertToOpensheet(url){
+      const id = (url.match(/\/d\/(.*?)(\/|$)/) || [])[1] || "";
+      return `https://opensheet.elk.sh/${id}/%E8%A1%A8%E5%96%AE%E5%9B%9E%E6%87%89%201`;
     }
 
-    function updateTypeOptions() {
+    /** 更新小隊下拉 **/
+    function updateTypeOptions(){
       const group = document.getElementById("group").value;
-      const typeSelect = document.getElementById("type");
-      typeSelect.innerHTML = "";
+      const sel   = document.getElementById("type");
+      sel.innerHTML = "";
 
-      if (group && userOptions[group]) {
-        typeSelect.disabled = false;
-        const types = Object.keys(userOptions[group]);
-        types.forEach(type => {
-          const option = document.createElement("option");
-          option.value = type;
-          option.textContent = type;
-          typeSelect.appendChild(option);
+      if(group && userOptions[group]){
+        sel.disabled = false;
+        Object.keys(userOptions[group]).forEach(type=>{
+          const opt = document.createElement("option");
+          opt.value = type; opt.textContent = type;
+          sel.appendChild(opt);
         });
-      } else {
-        typeSelect.disabled = true;
-        const option = document.createElement("option");
-        option.textContent = "請先選擇上方類別";
-        typeSelect.appendChild(option);
+      }else{
+        sel.disabled = true;
+        const opt = document.createElement("option");
+        opt.textContent = "請先選擇上方類別";
+        sel.appendChild(opt);
       }
     }
 
-    function fetchWithTimeout(url, timeout = 5000) {
-      return Promise.race([
-        fetch(url),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeout))
-      ]);
-    }
+    /** fetch 加 timeout **/
+    const fetchWithTimeout = (url,t=5000)=>
+      Promise.race([fetch(url),new Promise((_,rej)=>setTimeout(()=>rej(new Error("Timeout")),t))]);
 
-    async function checkTeamAttendance() {
-      const group = document.getElementById("group").value;
-      const type = document.getElementById("type").value;
-      const resultList = document.getElementById("result");
+    /** ============ 主查詢函式 ============ **/
+    async function checkTeamAttendance(){
+      const group   = document.getElementById("group").value;
+      const type    = document.getElementById("type").value;
+      const result  = document.getElementById("result");
       const loading = document.getElementById("loading");
+      result.innerHTML=""; loading.textContent="🔍 查詢中，請稍候...";
 
-      resultList.innerHTML = "";
-      if (loading) loading.textContent = "🔍 查詢中，請稍候...";
+      if(!group || !type || !userOptions[group][type]) return;
+      const users   = userOptions[group][type];
+      const backup  = backupNameMap[group] || "";
 
-      if (!group || !type || !userOptions[group][type]) return;
-      const users = userOptions[group][type];
+      const sheets  = await loadSheetsFromSheet();
 
-      const sheets = await loadSheetsFromSheet();
+      for(const sheet of sheets){
+        /* 先將所有人預設為未填 */
+        const statusMap={}; users.forEach(n=>statusMap[n]={filled:false,submitted:false});
 
-      for (let sheet of sheets) {
-        const userStatus = {};
-        users.forEach(name => userStatus[name] = { filled: false, submitted: false });
-
-        try {
-          const res = await fetchWithTimeout(sheet.url + "?t=" + Date.now(), 5000);
-          if (!res.ok) throw new Error("無法連接");
+        try{
+          const res = await fetchWithTimeout(sheet.url+"?t="+Date.now(),5000);
+          if(!res.ok) throw new Error("無法連接");
           const data = await res.json();
 
-          data.forEach(row => {
-            const values = Object.values(row);
-            const username = values[1];
-            if (!username || !users.includes(username)) return;
+          data.forEach(row=>{
+            const v = Object.values(row);
+            const parent = v[1];              // B欄 = 家長
+            if(!parent || !users.includes(parent)) return;
 
-            userStatus[username].submitted = true;
+            statusMap[parent].submitted = true;
 
-            for (let i = 0; i < 3; i++) {
-              const childName = values[2 + i * 3];
-              const squad = values[3 + i * 3];
-              const status = values[4 + i * 3];
-              if (squad === type) {
-                userStatus[username] = {
-                  filled: true,
-                  submitted: true,
-                  child: childName || '(未填小孩名)',
-                  status: status || '出席'
+            /* 檢查 D/G/J (index 3,6,9) */
+            for(let i=0;i<3;i++){
+              const child = v[2 + i*3];       // C/F/I
+              const squad = v[3 + i*3];       // D/G/J
+              const stat  = v[4 + i*3];       // E/H/K
+
+              if(squad === type || squad === backup){
+                statusMap[parent] = {
+                  filled:true,submitted:true,
+                  child: child || "(未填小孩名)",
+                  status: stat  || "出席"
                 };
               }
             }
           });
-        } catch (e) {
-          const li = document.createElement("li");
-          li.textContent = `${sheet.name}：⚠️ 查詢失敗（${e.message === "Timeout" ? "連線逾時" : "無法讀取"})`;
-          resultList.appendChild(li);
+
+        }catch(e){
+          const li=document.createElement("li");
+          li.textContent=`${sheet.name}：⚠️ 查詢失敗（${e.message==="Timeout"?"連線逾時":"無法讀取"}）`;
+          result.appendChild(li);
           continue;
         }
 
-        const header = document.createElement("li");
-        header.innerHTML = `<strong>${sheet.name}｜${type}小隊出席狀況：</strong>`;
-        header.style.backgroundColor = "#e0f0ff";
-        header.style.padding = "10px";
-        header.style.borderRadius = "8px";
-        header.style.fontSize = "1.1em";
-        header.style.fontWeight = "bold";
-        header.style.color = "#2a5d9f";
-        header.style.marginTop = "20px";
-        resultList.appendChild(header);
+        /* 表頭 */
+        const head=document.createElement("li");
+        head.innerHTML=`<strong>${sheet.name}｜${type}小隊出席狀況：</strong>`;
+        head.style.cssText="background:#e0f0ff;padding:10px;border-radius:8px;font-size:1.1em;font-weight:bold;color:#2a5d9f;margin-top:20px;";
+        result.appendChild(head);
 
-        users.forEach(name => {
-          const li = document.createElement("li");
-          if (userStatus[name].filled) {
-            const isPresent = userStatus[name].status.includes("出席");
-            li.innerHTML = `${name}：${userStatus[name].child}/<span class="${isPresent ? 'status-present' : 'status-absent'}">${isPresent ? '✅ 出席' : '❌ 請假'}</span>`;
-          } else if (userStatus[name].submitted) {
-            li.innerHTML = `${name}：<span style="color: orange; font-weight: bold;">⚠️ 有填表，但未填本小隊</span>`;
-          } else {
-            li.innerHTML = `${name}：<span class="status-unfilled">未填寫</span>`;
+        /* 個別列 */
+        users.forEach(name=>{
+          const li=document.createElement("li");
+          if(statusMap[name].filled){
+            const present=statusMap[name].status.includes("出席");
+            li.innerHTML=`${name}：${statusMap[name].child}/<span class="${present?"status-present":"status-absent"}">${present?"✅ 出席":"❌ 請假"}</span>`;
+          }else if(statusMap[name].submitted){
+            li.innerHTML=`${name}：<span style="color:orange;font-weight:bold;">⚠️ 有填表，但未填本小隊</span>`;
+          }else{
+            li.innerHTML=`${name}：<span class="status-unfilled">未填寫</span>`;
           }
-          resultList.appendChild(li);
+          result.appendChild(li);
         });
       }
-
-      loading.textContent = "";
+      loading.textContent="";
     }
   </script>
 </body>
